@@ -64,7 +64,7 @@ class TemplateForecaster(ForecastBot):
     async def run_research(self, question: MetaculusQuestion) -> str:
         async with self._concurrency_limiter:
             research = ""
-            elif os.getenv("OPENROUTER_API_KEY"):
+            if os.getenv("OPENROUTER_API_KEY"):
                 research = await self._call_perplexity(
                     question.question_text, use_open_router=True
                 )
