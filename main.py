@@ -64,16 +64,6 @@ class TemplateForecaster(ForecastBot):
     async def run_research(self, question: MetaculusQuestion) -> str:
         async with self._concurrency_limiter:
             research = ""
-            if os.getenv("ASKNEWS_CLIENT_ID") and os.getenv("ASKNEWS_SECRET"):
-                research = await AskNewsSearcher().get_formatted_news_async(
-                    question.question_text
-                )
-            elif os.getenv("EXA_API_KEY"):
-                research = await self._call_exa_smart_searcher(
-                    question.question_text
-                )
-            elif os.getenv("PERPLEXITY_API_KEY"):
-                research = await self._call_perplexity(question.question_text)
             elif os.getenv("OPENROUTER_API_KEY"):
                 research = await self._call_perplexity(
                     question.question_text, use_open_router=True
@@ -100,10 +90,12 @@ class TemplateForecaster(ForecastBot):
 
             Question:
             {question}
+
+            Try to find base rates/historical rates or any way that the current situation is different from history
             """
         )  # NOTE: The metac bot in Q1 put everything but the question in the system prompt.
         if use_open_router:
-            model_name = "openrouter/perplexity/sonar-reasoning"
+            model_name = "openrouter/perplexity/sonar-reasoning" #switch to GPT VLAD SEARCH
         else:
             model_name = "perplexity/sonar-pro"  # perplexity/sonar-reasoning and perplexity/sonar are cheaper, but do only 1 search
         model = GeneralLlm(
@@ -111,26 +103,6 @@ class TemplateForecaster(ForecastBot):
             temperature=0.1,
         )
         response = await model.invoke(prompt)
-        return response
-
-    async def _call_exa_smart_searcher(self, question: str) -> str:
-        """
-        SmartSearcher is a custom class that is a wrapper around an search on Exa.ai
-        """
-        searcher = SmartSearcher(
-            model=self.get_llm("default", "llm"),
-            temperature=0,
-            num_searches_to_run=2,
-            num_sites_per_search=10,
-        )
-        prompt = (
-            "You are an assistant to a superforecaster. The superforecaster will give"
-            "you a question they intend to forecast on. To be a great assistant, you generate"
-            "a concise but detailed rundown of the most relevant news, including if the question"
-            "would resolve Yes or No based on current information. You do not produce forecasts yourself."
-            f"\n\nThe question is: {question}"
-        )  # You can ask the searcher to filter by date, exclude/include a domain, and run specific searches for finding sources vs finding highlights within a source
-        response = await searcher.invoke(prompt)
         return response
 
     async def _run_forecast_on_binary(
@@ -163,6 +135,7 @@ class TemplateForecaster(ForecastBot):
             (b) The status quo outcome if nothing changed.
             (c) A brief description of a scenario that results in a No outcome.
             (d) A brief description of a scenario that results in a Yes outcome.
+            (e) Please consider the historical base rate and make a guess if you're not sure
 
             You write your rationale remembering that good forecasters put extra weight on the status quo outcome since the world changes slowly most of the time.
 
